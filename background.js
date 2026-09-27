@@ -100,6 +100,82 @@ async function flushQueue() {
   }
 }
 
+// ---------- merging page messages with browser notifications ----------
+// The same Slack message can arrive twice: as a browser notification (short
+// preview) and from the page watcher (full text). Notifications are held
+// briefly so the full-text version wins when both show up.
+
+const NOTIFICATION_HOLD_MS = 3000;
+const MERGE_WINDOW_MS = 2 * 60 * 1000;
+const pendingNotifications = new Map();
+const recentDom = [];
+const recentNotifications = [];
+
+function normText(s) {
+  return String(s || '')
+    .toLowerCase()
+    .replace(/(…|\.\.\.)\s*$/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function sameMessage(a, b) {
+  const A = normText(a);
+  const B = normText(b);
+  if (!A || !B) return false;
+  const k = Math.min(30, A.length, B.length);
+  if (k < 4) return A === B;
+  return A.includes(B.slice(0, k)) || B.includes(A.slice(0, k));
+}
+
+function prune(list) {
+  const cutoff = Date.now() - MERGE_WINDOW_MS;
+  while (list.length && list[0].at < cutoff) list.shift();
+}
+
+async function commit(item) {
+  console.log(`[relay] captured (${item.app}/${item.source}):`, item.title, '-', item.body);
+  const { [STATS_KEY]: stats = {} } = await chrome.storage.local.get(STATS_KEY);
+  await updateStats({ captured: (stats.captured || 0) + 1, lastCapturedAt: item.capturedAt });
+  await enqueue(item);
+  await flushQueue();
+}
+
+async function handleDomMessage(item) {
+  prune(recentDom);
+  prune(recentNotifications);
+  recentDom.push({ body: item.body, at: Date.now() });
+
+  for (const [id, pending] of pendingNotifications) {
+    if (sameMessage(pending.item.body, item.body)) {
+      clearTimeout(pending.timer);
+      pendingNotifications.delete(id);
+      console.log('[relay] notification replaced by full page message:', pending.item.title);
+    }
+  }
+
+  const alreadySent = recentNotifications.find((n) => sameMessage(n.body, item.body));
+  if (alreadySent && normText(item.body).length <= normText(alreadySent.body).length + 3) {
+    console.log('[relay] page message already sent as notification:', item.title);
+    return;
+  }
+  await commit(item);
+}
+
+function holdNotification(item) {
+  const timer = setTimeout(async () => {
+    pendingNotifications.delete(item.id);
+    prune(recentDom);
+    if (recentDom.some((d) => sameMessage(d.body, item.body))) {
+      console.log('[relay] notification skipped, full page message already sent:', item.title);
+      return;
+    }
+    recentNotifications.push({ body: item.body, at: Date.now() });
+    await commit(item);
+  }, NOTIFICATION_HOLD_MS);
+  pendingNotifications.set(item.id, { item, timer });
+}
+
 async function handleNotification(payload) {
   const config = await getConfig();
   const item = {
@@ -119,12 +195,15 @@ async function handleNotification(payload) {
     console.log('[relay] duplicate skipped:', item.title);
     return;
   }
-  console.log(`[relay] captured (${item.app}/${item.source}):`, item.title, '-', item.body);
 
-  const { [STATS_KEY]: stats = {} } = await chrome.storage.local.get(STATS_KEY);
-  await updateStats({ captured: (stats.captured || 0) + 1, lastCapturedAt: item.capturedAt });
-  await enqueue(item);
-  await flushQueue();
+  if (item.source === 'dom') {
+    item.id = `slack-${item.vps}-${item.tag}`;
+    return handleDomMessage(item);
+  }
+  if (item.source === 'Notification' || item.source === 'ServiceWorker') {
+    return holdNotification(item);
+  }
+  await commit(item);
 }
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
@@ -168,7 +247,7 @@ function ping(tabId) {
 
 async function injectInto(tabId) {
   await chrome.scripting.executeScript({ target: { tabId }, files: ['inject.js'], world: 'MAIN' });
-  await chrome.scripting.executeScript({ target: { tabId }, files: ['bridge.js'] });
+  await chrome.scripting.executeScript({ target: { tabId }, files: ['bridge.js', 'slack-dom.js'] });
 }
 
 async function checkTab(tab) {

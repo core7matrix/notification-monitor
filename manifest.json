@@ -19,6 +19,11 @@
       "matches": ["https://app.slack.com/*"],
       "js": ["bridge.js"],
       "run_at": "document_start"
+    },
+    {
+      "matches": ["https://app.slack.com/*"],
+      "js": ["slack-dom.js"],
+      "run_at": "document_idle"
     }
   ],
   "icons": {
