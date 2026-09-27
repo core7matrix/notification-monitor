@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Notification Relay</title>
+    <style>
+      body {
+        font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+        margin: 0;
+        padding: 16px;
+        min-width: 340px;
+        color: #1d1c1d;
+        background: #fafafa;
+      }
+      h1 {
+        font-size: 16px;
+        margin: 0 0 12px;
+      }
+      label {
+        display: block;
+        font-size: 12px;
+        font-weight: 600;
+        margin: 10px 0 4px;
+      }
+      input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 7px 8px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        font-size: 13px;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        margin-top: 14px;
+      }
+      button {
+        flex: 1;
+        padding: 8px;
+        border: none;
+        border-radius: 6px;
+        background: #4a154b;
+        color: #fff;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      button.secondary {
+        background: #e8e8e8;
+        color: #1d1c1d;
+      }
+      #message {
+        font-size: 12px;
+        margin-top: 10px;
+        min-height: 16px;
+      }
+      #stats {
+        font-size: 12px;
+        margin-top: 12px;
+        padding: 8px;
+        background: #fff;
+        border: 1px solid #e5e5e5;
+        border-radius: 6px;
+        line-height: 1.6;
+      }
+      .hidden {
+        display: none;
+      }
+      .error {
+        color: #c0392b;
+      }
+      .ok {
+        color: #1e7e34;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Notification Relay</h1>
+
+    <label for="vpsName">VPS name (shown on dashboard)</label>
+    <input id="vpsName" placeholder="vps-1" />
+
+    <label for="serverUrl">Server URL</label>
+    <input id="serverUrl" placeholder="https://your-server.com" />
+
+    <label for="apiKey">API key (INGEST_API_KEY on server)</label>
+    <input id="apiKey" type="password" />
+
+    <div class="row">
+      <button id="save">Save</button>
+      <button id="test" class="secondary">Send test</button>
+    </div>
+
+    <div class="row">
+      <button id="grant" class="hidden">Grant server access</button>
+    </div>
+
+    <div id="message"></div>
+    <div id="stats"></div>
+
+    <script src="options.js"></script>
+  </body>
+</html>

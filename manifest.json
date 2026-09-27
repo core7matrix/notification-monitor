@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "Notification Relay",
+  "version": "1.0.0",
+  "description": "Captures web notifications (Slack) from this browser and relays them to your dashboard server.",
+  "permissions": ["storage", "alarms"],
+  "host_permissions": ["https://*/*", "http://*/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://app.slack.com/*"],
+      "js": ["inject.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://app.slack.com/*"],
+      "js": ["bridge.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "action": {
+    "default_title": "Notification Relay",
+    "default_popup": "options.html"
+  },
+  "options_page": "options.html"
+}
