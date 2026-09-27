@@ -11,18 +11,29 @@ function fmt(ts) {
   return ts ? new Date(ts).toLocaleString() : 'never';
 }
 
+const TAB_STATE_TEXT = {
+  reloading: 'was put to sleep by Chrome, reloading it now',
+  loading: 'still loading',
+  frozen: 'frozen by Chrome. Click on the tab once to wake it',
+  'no-response': 'not responding. Refresh the tab',
+};
+
+function tabLine(tab) {
+  if (tab.state !== 'ok') {
+    return `<span class="error">Slack tab: ${TAB_STATE_TEXT[tab.state] || tab.state}</span>`;
+  }
+  if (tab.permission !== 'granted') {
+    return `<span class="error">Slack tab: connected, but notification permission is "${escapeHtml(tab.permission)}". Allow notifications for app.slack.com</span>`;
+  }
+  return '<span class="ok">Slack tab: connected, notifications allowed</span>';
+}
+
 async function renderStats() {
   const { stats = {}, pendingQueue = [] } = await chrome.storage.local.get(['stats', 'pendingQueue']);
-  const page = stats.lastPage;
-  const pageFresh = page && Date.now() - page.at < 3 * 60 * 1000;
-  let pageLine;
-  if (!pageFresh) {
-    pageLine = '<span class="error">Slack tab: not detected. Open or refresh app.slack.com</span>';
-  } else if (page.permission !== 'granted') {
-    pageLine = `<span class="error">Slack tab: connected, but notification permission is "${escapeHtml(page.permission)}". Allow notifications for app.slack.com</span>`;
-  } else {
-    pageLine = '<span class="ok">Slack tab: connected, notifications allowed</span>';
-  }
+  const tabs = stats.tabs || [];
+  const pageLine = tabs.length
+    ? tabs.map(tabLine).join('<br>')
+    : '<span class="error">Slack tab: no app.slack.com tab is open</span>';
 
   const serverOrigin = await getServerOrigin();
   const hasAccess = serverOrigin ? await chrome.permissions.contains({ origins: [`${serverOrigin}/*`] }) : true;
@@ -74,6 +85,7 @@ async function load() {
   const values = await chrome.storage.sync.get(fields);
   for (const f of fields) $(f).value = values[f] || '';
   renderStats();
+  chrome.runtime.sendMessage({ type: 'status' }).catch(() => {});
 }
 
 $('save').addEventListener('click', async () => {

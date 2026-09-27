@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="bg" gradientUnits="userSpaceOnUse" x1="4" y1="4" x2="124" y2="124">
+      <stop offset="0" stop-color="#6366F1"/>
+      <stop offset="1" stop-color="#4C1D95"/>
+    </linearGradient>
+    <linearGradient id="bell" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#E0E7FF"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="4" y="4" width="120" height="120" rx="28" fill="url(#bg)"/>
+
+  <!-- signal waves -->
+  <path d="M25 56 a36 36 0 0 0 0 28" fill="none" stroke="#FFFFFF" stroke-opacity="0.5" stroke-width="6" stroke-linecap="round"/>
+  <path d="M103 56 a36 36 0 0 1 0 28" fill="none" stroke="#FFFFFF" stroke-opacity="0.5" stroke-width="6" stroke-linecap="round"/>
+
+  <!-- bell -->
+  <circle cx="64" cy="30" r="6" fill="url(#bell)"/>
+  <path d="M64 32 C49 32 40 43 40 58 V71 C40 75 38 78 35 81 L33 83 C31 85 32 88 35 88 H93 C96 88 97 85 95 83 L93 81 C90 78 88 75 88 71 V58 C88 43 79 32 64 32 Z" fill="url(#bell)"/>
+  <path d="M54 94 a10 10 0 0 0 20 0 Z" fill="url(#bell)"/>
+
+  <!-- live dot -->
+  <circle cx="90" cy="34" r="14" fill="url(#bg)"/>
+  <circle cx="90" cy="34" r="10" fill="#22C55E"/>
+</svg>

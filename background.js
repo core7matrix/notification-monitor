@@ -36,7 +36,8 @@ async function getConfig() {
     'apiKey',
     'vpsName',
   ]);
-  return { serverUrl: serverUrl.replace(/\/+$/, ''), apiKey, vpsName };
+  const baseUrl = serverUrl.trim().replace(/\/+$/, '').replace(/\/api\/notifications\/ingest$/, '');
+  return { serverUrl: baseUrl, apiKey, vpsName };
 }
 
 async function updateStats(patch) {
@@ -143,9 +144,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       .then((data) => sendResponse({ ok: true, ...data }));
     return true;
   }
-  if (msg?.type === 'hello' && msg.payload) {
-    console.log('[relay] content script active:', msg.payload.url, 'permission:', msg.payload.permission);
-    updateStats({ lastPage: { ...msg.payload, at: Date.now() } }).finally(() => sendResponse({ ok: true }));
+  if (msg?.type === 'status') {
+    checkTabs().then((tabs) => sendResponse({ tabs }));
     return true;
   }
   if (msg?.type === 'flush') {
@@ -155,12 +155,72 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   return false;
 });
 
+// ---------- watched tabs ----------
+
+const WATCHED_URLS = [...new Set(chrome.runtime.getManifest().content_scripts.flatMap((cs) => cs.matches))];
+
+function ping(tabId) {
+  return Promise.race([
+    chrome.tabs.sendMessage(tabId, { type: 'ping' }),
+    new Promise((resolve) => setTimeout(() => resolve(null), 3000)),
+  ]).catch(() => null);
+}
+
+async function injectInto(tabId) {
+  await chrome.scripting.executeScript({ target: { tabId }, files: ['inject.js'], world: 'MAIN' });
+  await chrome.scripting.executeScript({ target: { tabId }, files: ['bridge.js'] });
+}
+
+async function checkTab(tab) {
+  const info = { id: tab.id, url: tab.url, title: tab.title };
+
+  if (tab.autoDiscardable) {
+    await chrome.tabs.update(tab.id, { autoDiscardable: false }).catch(() => {});
+  }
+  if (tab.discarded) {
+    console.log('[relay] tab was discarded by Chrome, reloading:', tab.url);
+    await chrome.tabs.reload(tab.id).catch(() => {});
+    return { ...info, state: 'reloading' };
+  }
+  if (tab.status !== 'complete') return { ...info, state: 'loading' };
+
+  let reply = await ping(tab.id);
+  if (!reply && !tab.frozen) {
+    console.log('[relay] content script not responding, re-injecting:', tab.url);
+    try {
+      await Promise.race([
+        injectInto(tab.id),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('inject timed out')), 5000)),
+      ]);
+      reply = await ping(tab.id);
+    } catch (err) {
+      console.warn('[relay] re-inject failed:', err);
+    }
+  }
+  if (!reply) return { ...info, state: tab.frozen ? 'frozen' : 'no-response' };
+  return { ...info, state: 'ok', permission: reply.permission };
+}
+
+async function checkTabs() {
+  const tabs = await chrome.tabs.query({ url: WATCHED_URLS });
+  const results = await Promise.all(tabs.map(checkTab));
+  await updateStats({ tabs: results, tabsCheckedAt: Date.now() });
+  return results;
+}
+
 function ensureAlarm() {
   chrome.alarms.create(RETRY_ALARM, { periodInMinutes: 1 });
 }
 
-chrome.runtime.onInstalled.addListener(ensureAlarm);
-chrome.runtime.onStartup.addListener(ensureAlarm);
+function onBoot() {
+  ensureAlarm();
+  checkTabs();
+}
+
+chrome.runtime.onInstalled.addListener(onBoot);
+chrome.runtime.onStartup.addListener(onBoot);
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === RETRY_ALARM) flushQueue();
+  if (alarm.name !== RETRY_ALARM) return;
+  flushQueue();
+  checkTabs();
 });
