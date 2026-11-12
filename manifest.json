@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Notification Relay",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Captures web notifications (Slack) from this browser and relays them to your dashboard server.",
   "permissions": ["storage", "alarms", "tabs", "scripting"],
   "host_permissions": ["https://*/*", "http://*/*"],

@@ -2,108 +2,644 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Notification Relay</title>
     <style>
-      body {
-        font-family: system-ui, -apple-system, Segoe UI, sans-serif;
-        margin: 0;
-        padding: 16px;
-        min-width: 340px;
-        color: #1d1c1d;
-        background: #fafafa;
+      :root {
+        --bg: #f6f7fb;
+        --surface: #ffffff;
+        --surface-2: #f1f2f7;
+        --border: #e4e6ef;
+        --text: #171a26;
+        --muted: #6b7083;
+        --accent: #5b5bd6;
+        --accent-hover: #4a4ac4;
+        --accent-soft: #ececfd;
+        --ok: #18a058;
+        --ok-soft: #e5f6ec;
+        --warn: #c27a00;
+        --warn-soft: #fdf3e0;
+        --err: #d03b3b;
+        --err-soft: #fce9e9;
+        --radius: 10px;
+        --shadow: 0 1px 2px rgba(20, 22, 40, 0.06), 0 1px 1px rgba(20, 22, 40, 0.03);
+        color-scheme: light;
       }
-      h1 {
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #121420;
+          --surface: #1b1e2c;
+          --surface-2: #232738;
+          --border: #2d3246;
+          --text: #e8eaf3;
+          --muted: #9298ad;
+          --accent: #7b7bf0;
+          --accent-hover: #8f8ff5;
+          --accent-soft: #2a2b4d;
+          --ok: #3ccf7f;
+          --ok-soft: #173326;
+          --warn: #f0b33c;
+          --warn-soft: #3a2f17;
+          --err: #f06a6a;
+          --err-soft: #3d1d22;
+          --shadow: none;
+          color-scheme: dark;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        width: 380px;
+        font: 13px/1.45 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        color: var(--text);
+        background: var(--bg);
+      }
+      /* Full-page options view: center a card-width column. */
+      body.page {
+        width: auto;
+        padding: 32px 16px;
+      }
+      body.page main {
+        max-width: 440px;
+        margin: 0 auto;
+      }
+
+      header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 14px 16px;
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+      }
+      body.page header {
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        margin-bottom: 12px;
+      }
+      header img {
+        width: 30px;
+        height: 30px;
+      }
+      .brand {
+        flex: 1;
+        min-width: 0;
+      }
+      .brand h1 {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 650;
+        letter-spacing: -0.01em;
+      }
+      .brand .sub {
+        color: var(--muted);
+        font-size: 11.5px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 3px 10px;
+        border-radius: 999px;
+        font-size: 11.5px;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .pill::before {
+        content: '';
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: currentColor;
+      }
+      .pill.ok {
+        color: var(--ok);
+        background: var(--ok-soft);
+      }
+      .pill.ok::before {
+        animation: pulse 2s ease-in-out infinite;
+      }
+      .pill.warn {
+        color: var(--warn);
+        background: var(--warn-soft);
+      }
+      .pill.err {
+        color: var(--err);
+        background: var(--err-soft);
+      }
+      @keyframes pulse {
+        50% {
+          opacity: 0.35;
+        }
+      }
+
+      main {
+        padding: 12px;
+        display: grid;
+        gap: 10px;
+      }
+      body.page main {
+        padding: 0;
+      }
+
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+      }
+      .card-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 14px 0;
+        font-size: 11px;
+        font-weight: 650;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .card-body {
+        padding: 10px 14px 14px;
+      }
+
+      /* Health checklist */
+      .checks {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 8px;
+      }
+      .checks li {
+        display: grid;
+        grid-template-columns: 18px 1fr;
+        gap: 8px;
+        align-items: start;
+      }
+      .checks .ico {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        font-size: 11px;
+        font-weight: 700;
+        margin-top: 1px;
+      }
+      .checks .ok .ico {
+        color: var(--ok);
+        background: var(--ok-soft);
+      }
+      .checks .warn .ico {
+        color: var(--warn);
+        background: var(--warn-soft);
+      }
+      .checks .err .ico {
+        color: var(--err);
+        background: var(--err-soft);
+      }
+      .checks b {
+        font-weight: 600;
+      }
+      .checks .detail {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+        overflow-wrap: anywhere;
+      }
+
+      /* Metrics */
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        border-top: 1px solid var(--border);
+      }
+      .metric {
+        padding: 10px 14px;
+      }
+      .metric + .metric {
+        border-left: 1px solid var(--border);
+      }
+      .metric .val {
+        font-size: 18px;
+        font-weight: 650;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: -0.02em;
+      }
+      .metric .lbl {
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .metric.alert .val {
+        color: var(--warn);
+      }
+      .times {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 8px 14px;
+        border-top: 1px solid var(--border);
+        color: var(--muted);
+        font-size: 11.5px;
+      }
+
+      /* Settings rows + switch */
+      .setting {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+      }
+      .setting .txt {
+        flex: 1;
+      }
+      .setting .name {
+        font-weight: 600;
+      }
+      .setting .desc {
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .switch {
+        position: relative;
+        flex: none;
+        width: 36px;
+        height: 20px;
+        margin-top: 1px;
+      }
+      .switch input {
+        position: absolute;
+        opacity: 0;
+        inset: 0;
+        margin: 0;
+        cursor: pointer;
+        z-index: 1;
+      }
+      .switch .track {
+        position: absolute;
+        inset: 0;
+        border-radius: 999px;
+        background: var(--border);
+        transition: background 0.15s;
+      }
+      .switch .track::after {
+        content: '';
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: #fff;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+        transition: transform 0.15s;
+      }
+      .switch input:checked + .track {
+        background: var(--accent);
+      }
+      .switch input:checked + .track::after {
+        transform: translateX(16px);
+      }
+      .switch input:focus-visible + .track {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      .sub-setting {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 10px;
+        padding: 8px 10px;
+        border-radius: 8px;
+        background: var(--surface-2);
+        font-size: 12px;
+      }
+      .sub-setting[hidden] {
+        display: none;
+      }
+      .hint {
+        margin-top: 8px;
+        font-size: 11.5px;
+        color: var(--warn);
+      }
+      .hint[hidden] {
+        display: none;
+      }
+
+      /* Connection form */
+      details.card > summary {
+        list-style: none;
+        cursor: pointer;
+        padding: 10px 14px;
         display: flex;
         align-items: center;
         gap: 8px;
-        font-size: 16px;
-        margin: 0 0 12px;
+        font-size: 11px;
+        font-weight: 650;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--muted);
+        user-select: none;
       }
-      h1 img {
-        width: 24px;
-        height: 24px;
+      details.card > summary::-webkit-details-marker {
+        display: none;
       }
-      label {
+      details.card > summary::after {
+        content: '';
+        margin-left: auto;
+        width: 7px;
+        height: 7px;
+        border-right: 1.5px solid currentColor;
+        border-bottom: 1.5px solid currentColor;
+        transform: rotate(45deg);
+        transition: transform 0.15s;
+      }
+      details.card[open] > summary::after {
+        transform: rotate(-135deg);
+      }
+      details.card > summary .summary-val {
+        text-transform: none;
+        letter-spacing: 0;
+        font-weight: 500;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 200px;
+      }
+      details .card-body {
+        padding-top: 0;
+      }
+
+      .field {
+        margin-bottom: 10px;
+      }
+      .field label {
         display: block;
         font-size: 12px;
         font-weight: 600;
-        margin: 10px 0 4px;
+        margin-bottom: 4px;
       }
-      input {
+      .field .help {
+        font-weight: 400;
+        color: var(--muted);
+      }
+      .input-wrap {
+        position: relative;
+      }
+      input[type='text'],
+      input[type='url'],
+      input[type='password'],
+      select {
         width: 100%;
-        box-sizing: border-box;
-        padding: 7px 8px;
-        border: 1px solid #ccc;
-        border-radius: 6px;
-        font-size: 13px;
+        padding: 7px 10px;
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        background: var(--surface);
+        color: var(--text);
+        font: inherit;
+        transition: border-color 0.15s, box-shadow 0.15s;
       }
-      .row {
-        display: flex;
-        gap: 8px;
-        margin-top: 14px;
-      }
-      button {
-        flex: 1;
-        padding: 8px;
-        border: none;
-        border-radius: 6px;
-        background: #4a154b;
-        color: #fff;
-        font-size: 13px;
+      select {
+        width: auto;
+        padding: 4px 8px;
         cursor: pointer;
       }
-      button.secondary {
-        background: #e8e8e8;
-        color: #1d1c1d;
+      input:focus,
+      select:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-soft);
       }
-      #message {
+      input.invalid {
+        border-color: var(--err);
+        box-shadow: 0 0 0 3px var(--err-soft);
+      }
+      .input-wrap input {
+        padding-right: 54px;
+      }
+      .reveal {
+        position: absolute;
+        right: 4px;
+        top: 50%;
+        transform: translateY(-50%);
+        padding: 3px 8px;
+        border: 0;
+        border-radius: 5px;
+        background: transparent;
+        color: var(--muted);
+        font: inherit;
+        font-size: 11.5px;
+        cursor: pointer;
+      }
+      .reveal:hover {
+        background: var(--surface-2);
+        color: var(--text);
+      }
+
+      .actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 4px;
+      }
+      .btn {
+        flex: 1;
+        padding: 8px 12px;
+        border: 1px solid transparent;
+        border-radius: 7px;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.15s, opacity 0.15s;
+      }
+      .btn:disabled {
+        opacity: 0.55;
+        cursor: default;
+      }
+      .btn.primary {
+        background: var(--accent);
+        color: #fff;
+      }
+      .btn.primary:hover:not(:disabled) {
+        background: var(--accent-hover);
+      }
+      .btn.secondary {
+        background: var(--surface);
+        border-color: var(--border);
+        color: var(--text);
+      }
+      .btn.secondary:hover:not(:disabled) {
+        background: var(--surface-2);
+      }
+      .btn.small {
+        flex: none;
+        padding: 4px 10px;
         font-size: 12px;
-        margin-top: 10px;
-        min-height: 16px;
       }
-      #stats {
+
+      .banner {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        border-radius: var(--radius);
+        background: var(--err-soft);
+        color: var(--err);
         font-size: 12px;
-        margin-top: 12px;
-        padding: 8px;
-        background: #fff;
-        border: 1px solid #e5e5e5;
-        border-radius: 6px;
-        line-height: 1.6;
       }
-      .hidden {
+      .banner span {
+        flex: 1;
+      }
+      .banner[hidden] {
         display: none;
       }
-      .error {
-        color: #c0392b;
+
+      .toast {
+        position: fixed;
+        left: 12px;
+        right: 12px;
+        bottom: 12px;
+        padding: 9px 12px;
+        border-radius: 8px;
+        background: var(--text);
+        color: var(--bg);
+        font-size: 12px;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+        opacity: 0;
+        transform: translateY(8px);
+        pointer-events: none;
+        transition: opacity 0.2s, transform 0.2s;
       }
-      .ok {
-        color: #1e7e34;
+      .toast.show {
+        opacity: 1;
+        transform: none;
+      }
+      .toast.err {
+        background: var(--err);
+        color: #fff;
+      }
+      .toast.ok {
+        background: var(--ok);
+        color: #fff;
+      }
+      body.page .toast {
+        left: 50%;
+        right: auto;
+        width: 420px;
+        margin-left: -210px;
       }
     </style>
   </head>
   <body>
-    <h1><img src="icons/icon.svg" alt="" />Notification Relay</h1>
+    <header>
+      <img src="icons/icon.svg" alt="" />
+      <div class="brand">
+        <h1>Notification Relay</h1>
+        <div class="sub" id="subtitle">Slack → dashboard</div>
+      </div>
+      <span class="pill warn" id="overall">Checking…</span>
+    </header>
 
-    <label for="vpsName">VPS name (shown on dashboard)</label>
-    <input id="vpsName" placeholder="vps-1" />
+    <main>
+      <div class="banner" id="grantBanner" hidden>
+        <span id="grantText">No permission to reach your server.</span>
+        <button class="btn primary small" id="grant">Grant access</button>
+      </div>
 
-    <label for="serverUrl">Server URL</label>
-    <input id="serverUrl" placeholder="https://your-server.com" />
+      <section class="card">
+        <div class="card-title">
+          Status
+          <button class="btn secondary small" id="refresh" title="Re-check Slack tabs">Refresh</button>
+        </div>
+        <div class="card-body">
+          <ul class="checks" id="checks"></ul>
+        </div>
+        <div class="metrics">
+          <div class="metric">
+            <div class="val" id="mCaptured">0</div>
+            <div class="lbl">Captured</div>
+          </div>
+          <div class="metric" id="mPendingBox">
+            <div class="val" id="mPending">0</div>
+            <div class="lbl">Pending</div>
+          </div>
+          <div class="metric">
+            <div class="val" id="mSwitches">0</div>
+            <div class="lbl">Auto-switches</div>
+          </div>
+        </div>
+        <div class="times">
+          <span>Last captured: <b id="tCaptured">never</b></span>
+          <span>Last sent: <b id="tSent">never</b></span>
+        </div>
+      </section>
 
-    <label for="apiKey">API key (INGEST_API_KEY on server)</label>
-    <input id="apiKey" type="password" />
+      <section class="card">
+        <div class="card-title">Behavior</div>
+        <div class="card-body">
+          <div class="setting">
+            <div class="txt">
+              <div class="name">Keep Slack in front</div>
+              <div class="desc">Switch back to the Slack tab whenever another tab becomes active.</div>
+            </div>
+            <label class="switch" title="Keep Slack in front">
+              <input type="checkbox" id="autoSwitch" />
+              <span class="track"></span>
+            </label>
+          </div>
+          <div class="sub-setting" id="delayRow" hidden>
+            <label for="autoSwitchDelay">Switch back</label>
+            <select id="autoSwitchDelay">
+              <option value="0">Immediately</option>
+              <option value="5">After 5 seconds</option>
+              <option value="15">After 15 seconds</option>
+              <option value="30">After 30 seconds</option>
+              <option value="60">After 1 minute</option>
+              <option value="300">After 5 minutes</option>
+              <option value="900">After 15 minutes</option>
+            </select>
+          </div>
+          <div class="hint" id="delayHint" hidden>
+            With “Immediately”, other tabs can’t stay open in front. Pick a delay if you need to use the browser.
+          </div>
+        </div>
+      </section>
 
-    <div class="row">
-      <button id="save">Save</button>
-      <button id="test" class="secondary">Send test</button>
-    </div>
+      <details class="card" id="connection">
+        <summary>Connection <span class="summary-val" id="connSummary"></span></summary>
+        <div class="card-body">
+          <div class="field">
+            <label for="vpsName">VPS name <span class="help">· shown on dashboard</span></label>
+            <input id="vpsName" type="text" placeholder="vps-1" autocomplete="off" />
+          </div>
+          <div class="field">
+            <label for="serverUrl">Server URL</label>
+            <input id="serverUrl" type="url" placeholder="https://your-server.com" autocomplete="off" />
+          </div>
+          <div class="field">
+            <label for="apiKey">API key <span class="help">· INGEST_API_KEY on server</span></label>
+            <div class="input-wrap">
+              <input id="apiKey" type="password" autocomplete="off" />
+              <button class="reveal" id="reveal" type="button">Show</button>
+            </div>
+          </div>
+          <div class="actions">
+            <button class="btn primary" id="save">Save</button>
+            <button class="btn secondary" id="test">Send test</button>
+          </div>
+        </div>
+      </details>
+    </main>
 
-    <div class="row">
-      <button id="grant" class="hidden">Grant server access</button>
-    </div>
-
-    <div id="message"></div>
-    <div id="stats"></div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
     <script src="options.js"></script>
   </body>

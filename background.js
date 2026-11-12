@@ -287,6 +287,107 @@ async function checkTabs() {
   return results;
 }
 
+// ---------- keep Slack in front ----------
+// When enabled, whenever the active tab is not Slack, switch back to the Slack
+// tab (after an optional delay so you can briefly use other tabs).
+
+const SWITCH_ALARM = 'switchToSlack';
+// setTimeout is only reliable while the service worker is awake (~30s after
+// an event); longer delays go through chrome.alarms.
+const MAX_TIMEOUT_DELAY_S = 25;
+let switchTimer = null;
+
+function isWatchedUrl(url) {
+  try {
+    const host = new URL(url).hostname;
+    return APPS.some((a) => a.match.test(host));
+  } catch {
+    return false;
+  }
+}
+
+async function getSwitchConfig() {
+  const { autoSwitch = false, autoSwitchDelay = 0 } = await chrome.storage.sync.get([
+    'autoSwitch',
+    'autoSwitchDelay',
+  ]);
+  return { enabled: !!autoSwitch, delay: Math.max(0, Number(autoSwitchDelay) || 0) };
+}
+
+function cancelPendingSwitch() {
+  if (switchTimer) clearTimeout(switchTimer);
+  switchTimer = null;
+  chrome.alarms.clear(SWITCH_ALARM);
+}
+
+async function activeTab() {
+  const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  return tab || null;
+}
+
+// Pages we never pull the user away from (extension settings, etc.).
+function isExempt(tab) {
+  return !tab || (tab.url || '').startsWith(chrome.runtime.getURL(''));
+}
+
+async function switchToSlack() {
+  const { enabled } = await getSwitchConfig();
+  if (!enabled) return;
+
+  const current = await activeTab();
+  if (!current || isWatchedUrl(current.url || current.pendingUrl) || isExempt(current)) return;
+
+  const slackTabs = await chrome.tabs.query({ url: WATCHED_URLS });
+  if (!slackTabs.length) return;
+  const target = slackTabs.find((t) => t.windowId === current.windowId) || slackTabs[0];
+
+  try {
+    await chrome.tabs.update(target.id, { active: true });
+    if (target.windowId !== current.windowId) {
+      await chrome.windows.update(target.windowId, { focused: true });
+    }
+    const { [STATS_KEY]: stats = {} } = await chrome.storage.local.get(STATS_KEY);
+    await updateStats({ autoSwitches: (stats.autoSwitches || 0) + 1, lastAutoSwitchAt: Date.now() });
+    console.log('[relay] switched back to Slack tab from:', current.url);
+  } catch (err) {
+    // Tab drag in progress or similar; the next event/alarm will retry.
+    console.warn('[relay] auto-switch failed:', err);
+  }
+}
+
+async function scheduleSwitch() {
+  cancelPendingSwitch();
+  const { enabled, delay } = await getSwitchConfig();
+  if (!enabled) return;
+
+  const current = await activeTab();
+  if (!current || isWatchedUrl(current.url || current.pendingUrl) || isExempt(current)) return;
+
+  if (delay === 0) return switchToSlack();
+  if (delay <= MAX_TIMEOUT_DELAY_S) {
+    switchTimer = setTimeout(() => {
+      switchTimer = null;
+      switchToSlack();
+    }, delay * 1000);
+  } else {
+    chrome.alarms.create(SWITCH_ALARM, { when: Date.now() + delay * 1000 });
+  }
+}
+
+chrome.tabs.onActivated.addListener(() => scheduleSwitch());
+chrome.windows.onFocusChanged.addListener((windowId) => {
+  if (windowId !== chrome.windows.WINDOW_ID_NONE) scheduleSwitch();
+});
+chrome.tabs.onUpdated.addListener((_id, change, tab) => {
+  // Active tab navigated away from (or to) Slack.
+  if (tab.active && change.url) scheduleSwitch();
+});
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'sync' && (changes.autoSwitch || changes.autoSwitchDelay)) scheduleSwitch();
+});
+
+// ---------- lifecycle ----------
+
 function ensureAlarm() {
   chrome.alarms.create(RETRY_ALARM, { periodInMinutes: 1 });
 }
@@ -294,12 +395,27 @@ function ensureAlarm() {
 function onBoot() {
   ensureAlarm();
   checkTabs();
+  ensureSwitchScheduled();
 }
 
 chrome.runtime.onInstalled.addListener(onBoot);
 chrome.runtime.onStartup.addListener(onBoot);
 chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === SWITCH_ALARM) {
+    switchToSlack();
+    return;
+  }
   if (alarm.name !== RETRY_ALARM) return;
   flushQueue();
   checkTabs();
+  ensureSwitchScheduled();
 });
+
+// Safety net in case a pending switch was lost (e.g. the worker was restarted
+// and its timer with it). Never restarts a delay that is already counting down.
+async function ensureSwitchScheduled() {
+  const { enabled } = await getSwitchConfig();
+  if (!enabled || switchTimer) return;
+  if (await chrome.alarms.get(SWITCH_ALARM)) return;
+  scheduleSwitch();
+}
